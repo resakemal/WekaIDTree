@@ -31,17 +31,33 @@ public class myID3 extends Classifier implements Serializable{
 
   /** Class attribute of dataset. */
   private Attribute m_ClassAttribute;
-    
+  
 //    private final Instances dataIris;
     
+  /** Default class value if receiving missing value */
     public myID3(){
 //        this.dataIris = DataSource.read("G:/STEI/STI/Semester 7/IF 4071 Pembelajaran Mesin/Tubes 1/weka-3-6-14/iris.2D.arff");
         System.out.println("Hello, World!"); 
     }
 
-    public static class Node {
-        private Attribute attr;
-        private Node[] children;
+    private static class Default {
+        private Attribute classAttribute;
+        private double classValue;
+        
+        private Default(Attribute classAttribute, double classValue){
+            this.classAttribute = classAttribute;
+            this.classValue = classValue;
+        }
+        
+        private Attribute classAttribute(){
+            
+            return this.classAttribute;
+        }
+        
+        private double classValue(){
+            
+            return this.classValue;
+        }
     }
     
     /**
@@ -85,7 +101,8 @@ public class myID3 extends Classifier implements Serializable{
     data = new Instances(data);
     data.deleteWithMissingClass();
     
-    makeTree(data);
+    Default default_data = computeDefaultValue(data);
+    makeTree(data, default_data);
   }
 
   /**
@@ -94,12 +111,13 @@ public class myID3 extends Classifier implements Serializable{
    * @param data the training data
    * @exception Exception if decision tree can't be built successfully
    */
-  private void makeTree(Instances data) throws Exception {
+  private void makeTree(Instances data, Default default_data) throws Exception {
 
-    // Check if no instances have reached this node.
+    // Check if no instances have reached this node. Missing Value
     if (data.numInstances() == 0) {
       main_Attribute = null;
-      m_ClassValue = Instance.missingValue();
+      m_ClassValue = default_data.classValue();
+      m_ClassAttribute = default_data.classAttribute();
       class_Distribution = new double[data.numClasses()];
       return;
     }
@@ -131,7 +149,7 @@ public class myID3 extends Classifier implements Serializable{
       child_Nodes = new myID3[main_Attribute.numValues()];
       for (int j = 0; j < main_Attribute.numValues(); j++) {
         child_Nodes[j] = new myID3();
-        child_Nodes[j].makeTree(splitData[j]);
+        child_Nodes[j].makeTree(splitData[j], default_data);
       }
     }
   }
@@ -154,8 +172,7 @@ public class myID3 extends Classifier implements Serializable{
     if (main_Attribute == null) {
       return m_ClassValue;
     } else {
-      return child_Nodes[(int) instance.value(main_Attribute)].
-        classifyInstance(instance);
+      return child_Nodes[(int) instance.value(main_Attribute)].classifyInstance(instance);
     }
   }
 
@@ -181,6 +198,28 @@ public class myID3 extends Classifier implements Serializable{
       return child_Nodes[(int) instance.value(main_Attribute)].
         distributionForInstance(instance);
     }
+  }
+  
+  /**
+   * Computes default value for the tree.
+   *
+   * @param data the data for which info gain is to be computed
+   * @return object data of default class value and attribute
+   * @throws Exception if process fails
+   */
+  private Default computeDefaultValue(Instances data) 
+    throws Exception {
+
+        double[] temp_Distribution = new double[data.numClasses()];
+        Enumeration instEnum = data.enumerateInstances();
+        while (instEnum.hasMoreElements()) {
+          Instance inst = (Instance) instEnum.nextElement();
+          class_Distribution[(int) inst.classValue()]++;
+        }
+        Utils.normalize(class_Distribution);
+        Default default_leaf = new Default(data.classAttribute(), Utils.maxIndex(class_Distribution));
+        
+        return default_leaf;
   }
 
   /**
