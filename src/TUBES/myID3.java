@@ -40,8 +40,8 @@ public class myID3 extends Classifier implements Serializable{
     }
 
     private static class Default {
-        private Attribute classAttribute;
-        private double classValue;
+        private final Attribute classAttribute;
+        private final double classValue;
         
         private Default(Attribute classAttribute, double classValue){
             this.classAttribute = classAttribute;
@@ -159,7 +159,6 @@ public class myID3 extends Classifier implements Serializable{
    * @return the classification
    * @throws NoSupportForMissingValuesException if instance has missing values
    */
-  @Override
   public double classifyInstance(Instance instance) 
     throws NoSupportForMissingValuesException {
 
@@ -168,7 +167,7 @@ public class myID3 extends Classifier implements Serializable{
                                                    + "please.");
     }
     if (main_Attribute == null) {
-      return m_ClassValue;
+      return m_ClassValue; // m_ClassAttribute.value((int) m_ClassValue) m_ClassValue
     } else {
       return child_Nodes[(int) instance.value(main_Attribute)].classifyInstance(instance);
     }
@@ -297,6 +296,7 @@ public class myID3 extends Classifier implements Serializable{
    *
    * @return a textual description of the classifier
    */
+  @Override
   public String toString() {
 
     if ((class_Distribution == null) && (child_Nodes == null)) {
