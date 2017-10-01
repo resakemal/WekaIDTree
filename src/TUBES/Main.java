@@ -193,6 +193,8 @@ public class Main {
         return data;
     }
     
+    
+    
     /**
      * @param args the command line arguments
      * @throws java.lang.Exception
@@ -200,13 +202,15 @@ public class Main {
     public static void main(String[] args) throws Exception {
         // TODO code application logic here
         
+        Scanner scan = new Scanner(System.in);
+        
         Instances rawData, playData;
         
         Main model = new Main();
         
         /* LOAD DATA */
         
-        String fileName = "weather.nominal.arff"; // weather.nominal.arff
+        System.out.print("Masukkan nama file -> "); String fileName = scan.next();// String fileName = "weather.nominal.arff"
         playData = model.prepareData(fileName);
         
 //        /* BUILD ID3 CLASSIFIER */
