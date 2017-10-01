@@ -6,6 +6,8 @@
 package id3;
 
 import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.Random;
 import weka.core.Capabilities;
 import weka.core.Capabilities.Capability;
 import weka.core.Instance;
@@ -13,7 +15,6 @@ import weka.core.Instances;
 import weka.classifiers.Classifier;
 import weka.core.Attribute;
 import weka.core.Utils;
-import weka.core.NoSupportForMissingValuesException;
 
 import java.util.Enumeration;
 
@@ -29,11 +30,15 @@ public class myC45 extends Classifier implements Serializable{
   /** Class value if node is leaf. */
   private double m_ClassValue;
 
-  /** Class distribution if node is leaf. */
+  /** Class distribution of node. */
   private double[] class_Distribution;
 
   /** Class attribute of dataset. */
   private Attribute m_ClassAttribute;
+  
+  /** Container for storing chosen numeric value 
+   * for numeric attributes. */
+  private double[] numericValues;
   
 //    private final Instances dataIris;
     
@@ -124,21 +129,24 @@ public class myC45 extends Classifier implements Serializable{
       class_Distribution = new double[data.numClasses()];
       return;
     }
-    
-
+        
     // Compute attribute with maximum information gain.
     // If attribute is continuous valued, define discrete values for attribute
-    double[] gainRatio = new double[data.numAttributes()];
+    double[] gainRatios = new double[data.numAttributes()];
     Enumeration attEnum = data.enumerateAttributes();
     while (attEnum.hasMoreElements()) {
       Attribute att = (Attribute) attEnum.nextElement();
-      gainRatio[att.index()] = computeInfoGain(data, att)/computeSplitInfo(data,att);
+      if (att.isNumeric()) {
+        gainRatios[att.index()] = calculateNumeric(data, att);
+      } else {
+        gainRatios[att.index()] = computeInfoGain(data, att)/computeSplitInfo(data,att);
+      }
     }
-    main_Attribute = data.attribute(Utils.maxIndex(gainRatio));
+    main_Attribute = data.attribute(Utils.maxIndex(gainRatios));
     
     // Make leaf if information gain is zero. 
     // Otherwise create successors.
-    if (Utils.eq(gainRatio[main_Attribute.index()], 0)) {
+    if (Utils.eq(gainRatios[main_Attribute.index()], 0)) {
       main_Attribute = null;
       class_Distribution = new double[data.numClasses()];
       Enumeration instEnum = data.enumerateInstances();
@@ -150,9 +158,19 @@ public class myC45 extends Classifier implements Serializable{
       m_ClassValue = Utils.maxIndex(class_Distribution);
       m_ClassAttribute = data.classAttribute();
     } else {
-      Instances[] splitData = splitData(data, main_Attribute);
-      child_Nodes = new myC45[main_Attribute.numValues()];
-      for (int j = 0; j < main_Attribute.numValues(); j++) {
+      // Put data with missing attribute value into class distribution
+      handleMissingValues(data);
+      
+      Instances[] splitData;
+      myC45[] child_Nodes;
+      if (!main_Attribute.isNumeric()) {
+        splitData = splitData(data, main_Attribute);
+        child_Nodes = new myC45[main_Attribute.numValues()];
+      } else {
+        splitData = splitDataNumeric(data, main_Attribute, numericValues[main_Attribute.index()]);
+        child_Nodes = new myC45[2];
+      }      
+      for (int j = 0; j < child_Nodes.length; j++) {
         child_Nodes[j] = new myC45();
         child_Nodes[j].makeTree(splitData[j], default_data);
       }
@@ -164,16 +182,23 @@ public class myC45 extends Classifier implements Serializable{
    *
    * @param instance the instance to be classified
    * @return the classification
-   * @throws NoSupportForMissingValuesException if instance has missing values
    */
   @Override
-  public double classifyInstance(Instance instance) 
-    throws NoSupportForMissingValuesException {
+  public double classifyInstance(Instance instance) {
 
     if (main_Attribute == null) {
       return m_ClassValue;
     } else {
-      return child_Nodes[(int) instance.value(main_Attribute)].classifyInstance(instance);
+      if (main_Attribute.isNumeric()) {
+        if (instance.value(main_Attribute) <= numericValues[main_Attribute.index()]) {
+           return child_Nodes[0].classifyInstance(instance); 
+        } else {
+           return child_Nodes[1].classifyInstance(instance); 
+        }
+      } else {
+            return child_Nodes[(int) instance.value(main_Attribute)].
+        classifyInstance(instance);
+      }
     }
   }
 
@@ -182,18 +207,24 @@ public class myC45 extends Classifier implements Serializable{
    *
    * @param instance the instance for which distribution is to be computed
    * @return the class distribution for the given instance
-   * @throws NoSupportForMissingValuesException if instance has missing values
    */
   
   @Override
-  public double[] distributionForInstance(Instance instance) 
-    throws NoSupportForMissingValuesException {
+  public double[] distributionForInstance(Instance instance) {
 
     if (main_Attribute == null) {
       return class_Distribution;
-    } else { 
-      return child_Nodes[(int) instance.value(main_Attribute)].
+    } else {
+      if (main_Attribute.isNumeric()) {
+        if (instance.value(main_Attribute) <= numericValues[main_Attribute.index()]) {
+           return child_Nodes[0].distributionForInstance(instance); 
+        } else {
+           return child_Nodes[1].distributionForInstance(instance); 
+        }
+      } else {
+            return child_Nodes[(int) instance.value(main_Attribute)].
         distributionForInstance(instance);
+      }
     }
   }
   
@@ -242,6 +273,29 @@ public class myC45 extends Classifier implements Serializable{
     return infoGain;
   }
   
+  /**
+   * Computes information gain for an attribute.
+   *
+   * @param data the data for which info gain is to be computed
+   * @param att the attribute
+   * @return the information gain for the given attribute and data
+   * @throws Exception if computation fails
+   */
+  private double computeNumericInfoGain(Instances data, Attribute att, double value) 
+    throws Exception {
+
+    double infoGain = computeEntropy(data);
+    Instances[] splitData = splitDataNumeric(data, att, value);
+    for (int j = 0; j < att.numValues(); j++) {
+      if (splitData[j].numInstances() > 0) {
+        infoGain -= ((double) splitData[j].numInstances() /
+                     (double) data.numInstances()) *
+          computeEntropy(splitData[j]);
+      }
+    }
+    return infoGain;
+  }
+  
     /**
    * Computes information gain for an attribute.
    *
@@ -258,13 +312,13 @@ public class myC45 extends Classifier implements Serializable{
       Instance inst = (Instance) instEnum.nextElement();
       valueCount[(int) inst.value(att)]++;
     }
-    double entropy = 0;
+    double splitInfo = 0;
     for (int j = 0; j < att.numValues(); j++) {
       if (valueCount[j] > 0) {
-        entropy -= (valueCount[j] / (double) data.numInstances()) * Utils.log2(valueCount[j] / (double) data.numInstances());
+        splitInfo -= (valueCount[j] / (double) data.numInstances()) * Utils.log2(valueCount[j] / (double) data.numInstances());
       }
     }
-    return entropy;
+    return splitInfo;
   }
 
   /**
@@ -314,5 +368,101 @@ public class myC45 extends Classifier implements Serializable{
           splitData1.compactify();
       }
     return splitData;
+  }
+  
+  /**
+   * Splits a dataset according to a numeric value into 2 boolean instances
+   *
+   * @param data the data which is to be split
+   * @param att the attribute to be used for splitting
+   * @return the sets of instances produced by the split
+   */
+  private Instances[] splitDataNumeric(Instances data, Attribute att, double value) {
+
+    Instances[] splitData = new Instances[2];
+    for (int j = 0; j < 2; j++) {
+      splitData[j] = new Instances(data, data.numInstances());
+    }
+    Enumeration instEnum = data.enumerateInstances();
+    while (instEnum.hasMoreElements()) {
+      Instance inst = (Instance) instEnum.nextElement();
+      if(inst.value(att) <= value) {
+          splitData[0].add(inst);
+      } else {
+          splitData[1].add(inst);
+      }
+    }
+      for (Instances splitData1 : splitData) {
+          splitData1.compactify();
+      }
+    return splitData;
+  }
+  
+  /**
+   * Select all possible split from data, then randomly choose 10 splits to 
+   * compare by gain ratio and select value of best split
+   *
+   * @param data the data which value of split to be decided
+   * @param att the attribute to be used for splitting
+   * @return the gain ratio of the best split value
+   */
+  private double calculateNumeric (Instances data, Attribute att) 
+      throws Exception {
+      // Sort data for iteration
+      data.sort(att);
+      
+      // Determine splits by class difference in 2 instances
+      ArrayList<Double> splitList = new ArrayList<>(); 
+      Instance check = data.instance(0);
+      Enumeration instEnum = data.enumerateInstances();
+      while (instEnum.hasMoreElements()) {
+        Instance inst = (Instance) instEnum.nextElement();
+        if (check.classValue() != inst.classValue()) {
+            splitList.add((check.value(att) + inst.value(att)) / 2);
+        }
+        check = inst;
+      }
+      
+      // If there are more than 10 splits, randomly choose 10
+      Random rn = new Random();
+      ArrayList<Double> randomSplit = new ArrayList<>();
+      if (splitList.size() <= 10) {
+          randomSplit = splitList;
+      } else {
+        for (int i = 0; i < 10; i++) {
+            randomSplit.add(splitList.get(rn.nextInt(11)));
+        }
+      }
+      
+      // Calculate gain ratio for split candidate
+      double[] infoGains = new double[data.numAttributes()];
+      for (int i = 0; i < randomSplit.size(); i++) {       
+        infoGains[i] = computeNumericInfoGain(data, att, randomSplit.get(i));
+      }
+      int chosenIndex = Utils.maxIndex(infoGains);
+      numericValues[att.index()] = randomSplit.get(chosenIndex);
+      return infoGains[chosenIndex];
+  }
+  
+  /**
+   * Add data with missing value to class distribution with rule
+   * of most common class
+   *
+   * @param data the data which class distribution is to be determined
+   */
+  private void handleMissingValues(Instances data) {
+      // Create class distribution based on data
+      double missingCount = 0;
+      Enumeration instEnum1 = data.enumerateInstances();
+      while (instEnum1.hasMoreElements()) {
+        Instance inst = (Instance) instEnum1.nextElement();
+        if (!inst.isMissing(main_Attribute)) {
+            class_Distribution[(int) inst.classValue()]++;
+        } else {
+            missingCount++;
+        }
+      }
+      class_Distribution[Utils.maxIndex(class_Distribution)] += missingCount;
+      Utils.normalize(class_Distribution);
   }
 }
