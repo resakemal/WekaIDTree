@@ -80,7 +80,7 @@ public class Main {
         Instances train = new Instances(data, 0, trainSize);
         Instances test = new Instances(data, trainSize, testSize);
         Evaluation eval = new Evaluation(test);
-        myID3 cls = new myID3();
+        Classifier cls = classifier;
         cls.buildClassifier(train);
         System.out.println("check");
         eval.evaluateModel(cls, test);
@@ -126,9 +126,8 @@ public class Main {
         if (valid) {
             Evaluation evaluation;
             try {
-                Instances data1 = data;
 
-                evaluation = new Evaluation(data1);
+                evaluation = new Evaluation(data);
                 evaluation.evaluateModel(classifier, evalData);
 
                 System.out.println(evaluation.toSummaryString());
@@ -220,6 +219,7 @@ public class Main {
     
     public static void runID3(Instances data, Main model) throws Exception{
 
+        /* Discretize Data to handle Numeric value */
         Discretize D = new Discretize();
         D.setInputFormat(data);
         data = Filter.useFilter(data, D);
