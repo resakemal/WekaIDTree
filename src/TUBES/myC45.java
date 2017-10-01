@@ -17,6 +17,7 @@ import weka.core.Attribute;
 import weka.core.Utils;
 
 import java.util.Enumeration;
+import java.util.HashMap;
 
 public class myC45 extends Classifier implements Serializable{
     
@@ -53,6 +54,7 @@ public class myC45 extends Classifier implements Serializable{
             splitController = new SplitData();
 //        this.dataIris = DataSource.read("G:/STEI/STI/Semester 7/IF 4071 Pembelajaran Mesin/Tubes 1/weka-3-6-14/iris.2D.arff");;
     }
+    
     private static class Default {
         private Attribute classAttribute;
         private double classValue;
@@ -178,8 +180,8 @@ public class myC45 extends Classifier implements Serializable{
     }
     main_Attribute = data.attribute(Utils.maxIndex(gainRatios));
     usedAttributes.add(main_Attribute);
-    for (int i = 0; i < numericValues.length; i++)
-    System.out.println(gainRatios[i]);
+    //for (int i = 0; i < numericValues.length; i++)
+    //System.out.println(gainRatios[i]);
     
     // Make leaf if information gain is zero. 
     // Otherwise create successors.
@@ -476,27 +478,55 @@ public class myC45 extends Classifier implements Serializable{
       }
   }
   
-  /**
-   * Add data with missing value to class distribution with rule
-   * of most common class
-   *
-   * @param data the data which class distribution is to be determined
-   */
-  private void handleMissingValues(Instances data, Attribute att) {
-      // Create class distribution based on data
-      double missingCount = 0;
-      Enumeration instEnum1 = data.enumerateInstances();
-      while (instEnum1.hasMoreElements()) {
-        Instance inst = (Instance) instEnum1.nextElement();
-        if (!inst.isMissing(main_Attribute)) {
-            class_Distribution[(int) inst.classValue()]++;
+    private ArrayList<Double> getChildClasses(myC45 subTree) {
+        // If node is not leaf, get child's class value
+        ArrayList<Double> childValues = new ArrayList<>();
+        if (subTree.main_Attribute != null) {
+            for (int i = 0; i < subTree.child_Nodes.length; i++) {
+                childValues.addAll(getChildClasses(subTree.child_Nodes[i]));
+            }
         } else {
-            missingCount++;
+            childValues.add(subTree.m_ClassValue);
         }
-      }
-      class_Distribution[Utils.maxIndex(class_Distribution)] += missingCount;
-      Utils.normalize(class_Distribution);
-  }
+        return childValues;
+    }
+    
+    private Double getMajorityClass(myC45 subTree) {
+        ArrayList<Double> childValues = getChildClasses(subTree);
+        HashMap<Double,Integer> hm = new HashMap<Double,Integer>();
+        int max  = 1;
+        Double temp = 0.0;
+
+        for(int i = 0; i < childValues.size(); i++) {
+
+            if (hm.get(childValues.get(i)) != null) {
+
+                int count = hm.get(childValues.get(i));
+                count++;
+                hm.put(childValues.get(i), count);
+
+                if(count > max) {
+                    max  = count;
+                    temp = childValues.get(i);
+                }
+            }
+            else 
+                hm.put(childValues.get(i),1);
+        }
+        return temp;
+    }
+    
+    private boolean isPrune(myC45 treeNow) {
+        return true;
+    }
+
+    public void pruneTree() {
+//        get tree root
+//        change subtree below with leaf or majority
+//        measure accuracy
+//        if ok then prune
+//        else to next non leaf node
+    }
   
   /**
    * Prints the decision tree using the private toString method from below.
