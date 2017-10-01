@@ -286,9 +286,9 @@ public class myID3 extends Classifier implements Serializable{
       Instance inst = (Instance) instEnum.nextElement();
       splitData[(int) inst.value(att)].add(inst);
     }
-      for (Instances splitData1 : splitData) {
-          splitData1.compactify();
-      }
+    for (Instances splitData1 : splitData) {
+        splitData1.compactify();
+    }
     return splitData;
   }
   
