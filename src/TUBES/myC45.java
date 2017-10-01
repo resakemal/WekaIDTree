@@ -84,6 +84,7 @@ public class myC45 extends Classifier implements Serializable{
 
     // attributes
     result.enable(Capability.NOMINAL_ATTRIBUTES);
+    result.enable(Capability.NUMERIC_ATTRIBUTES);
 
     // class
     result.enable(Capability.NOMINAL_CLASS);
@@ -458,5 +459,49 @@ public class myC45 extends Classifier implements Serializable{
       }
       class_Distribution[Utils.maxIndex(class_Distribution)] += missingCount;
       Utils.normalize(class_Distribution);
+  }
+  
+  /**
+   * Prints the decision tree using the private toString method from below.
+   *
+   * @return a textual description of the classifier
+   */
+  @Override
+  public String toString() {
+
+    if ((class_Distribution == null) && (child_Nodes == null)) {
+      return "Id3: No model built yet.";
+    }
+    return "Id3\n\n" + toString(0);
+  }
+  
+  /**
+   * Outputs a tree at a certain level.
+   *
+   * @param level the level at which the tree is to be printed
+   * @return the tree as string at the given level
+   */
+  private String toString(int level) {
+
+    StringBuilder text = new StringBuilder();
+    
+    if (main_Attribute == null) {
+      if (Instance.isMissingValue(m_ClassValue)) {
+        text = text.append(": null");
+      } else {
+        text = text.append(": ").append(m_ClassAttribute.value((int) m_ClassValue));
+      } 
+    } else {
+      for (int j = 0; j < main_Attribute.numValues(); j++) {
+        text = text.append("\n");
+        for (int i = 0; i < level; i++) {
+          text = text.append("|  ");
+        }
+        text = text.append(main_Attribute.name()).append(" = ").append(main_Attribute.value(j));
+        text = text.append(child_Nodes[j].toString(level + 1));
+      }
+    }
+    return text.toString();
+
   }
 }

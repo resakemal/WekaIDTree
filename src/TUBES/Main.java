@@ -7,6 +7,8 @@ package TUBES;
 
 import java.util.Random;
 import java.util.Scanner;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import weka.classifiers.Classifier;
 import weka.classifiers.Evaluation;
 import weka.core.Instance;
@@ -26,6 +28,7 @@ public class Main {
     myID3 id3;
     myC45 c45;
     
+    String fileName;
     // membuat instance baru dari masukan pengguna
     public Instance makeNewInstance(Instances data) {
         
@@ -168,7 +171,7 @@ public class Main {
 
         c45.buildClassifier(data);
         
-//        System.out.println(c45.toString());
+        System.out.println(c45.toString());
     }        
     
     public Instances prepareData(String fileName) throws Exception
@@ -193,26 +196,34 @@ public class Main {
         return data;
     }
     
+    public static void mainMenu(Instances data, Main model){
+        Scanner in = new Scanner(System.in);
+        
+        int pilihan;
+        
+        do{
+            System.out.println("Pilih algoritma yang akan digunakan");
+            System.out.println("1. ID3");
+            System.out.println("2. C45");
+            pilihan = in.nextInt();
+            
+            switch (pilihan){
+                    
+                case 1: runID3(data, model);
+                break;
+
+                case 2: runC45(data, model);
+                break;
+                
+                default: break;
+             }
+            
+            
+        }while(pilihan != -99);
+    }
     
-    
-    /**
-     * @param args the command line arguments
-     * @throws java.lang.Exception
-     */
-    public static void main(String[] args) throws Exception {
-        // TODO code application logic here
-        
-        Scanner scan = new Scanner(System.in);
-        
-        Instances rawData, playData;
-        
-        Main model = new Main();
-        
-        /* LOAD DATA */
-        
-        System.out.print("Masukkan nama file -> "); String fileName = scan.next();// String fileName = "weather.nominal.arff"
-        playData = model.prepareData(fileName);
-        
+    public static void runID3(Instances data, Main model){
+
 //        /* BUILD ID3 CLASSIFIER */
 //        
 //        System.out.println("Build ID3 with "+fileName);
@@ -246,31 +257,45 @@ public class Main {
 //        myID3 x = (myID3) model.load("ID3.model");
 //        
 //        model.evaluate(x, playData);
-
-        /* BUILD C4.5 CLASSIFIER */
+    }
+    
+    public static void runC45(Instances data, Main model){
+         /* BUILD C4.5 CLASSIFIER */
         
-        System.out.println("Build C4.5 with "+fileName);
-        model.prepareC45(playData); 
+        System.out.println("Build C4.5 with "+model.fileName);
+        try { 
+            model.prepareC45(data);
+        } catch (Exception ex) {
+            Logger.getLogger(Main.class.getName()).log(Level.SEVERE, null, ex);
+        }
         System.out.println();
         
         /* TESTING & EVALUATION */
-        
-        System.out.println("Full Training - ID3 with "+fileName);
-        model.evaluate(model.c45, playData);
-        
-        System.out.println("10-Fold Cross Validation - ID3 with "+fileName);
-        model.validate(model.c45, playData);
-        
-        System.out.println("Split Test - ID3 with "+fileName);
-        model.split_test(model.c45, playData);
+        try{
+            System.out.println("Full Training - ID3 with "+model.fileName);
+            model.evaluate(model.c45, data);
 
-        /* MODEL TEST USING DATA SET */
-        model.test(model.id3, playData);
+            System.out.println("10-Fold Cross Validation - ID3 with "+model.fileName);
+            model.validate(model.c45, data);
+
+            System.out.println("Split Test - ID3 with "+model.fileName);
+            model.split_test(model.c45, data);
+        } catch (Exception ex){
+            //System.out.println(ex.getMessage());
+            Logger.getLogger(Main.class.getName()).log(Level.SEVERE, null, ex);
+        }
+
+        try {
+            /* MODEL TEST USING DATA SET */
+            model.test(model.c45, data);
+        } catch (Exception ex) {
+            Logger.getLogger(Main.class.getName()).log(Level.SEVERE, null, ex);
+        }
         
         /* Classifying Instance */
         
-        Instance test = model.makeNewInstance(playData);
-        System.out.println(playData.classAttribute().value((int) model.c45.classifyInstance(test)));
+        Instance test = model.makeNewInstance(data);
+        System.out.println(data.classAttribute().value((int) model.c45.classifyInstance(test)));
 
         /* SAVE-LOAD MODEL */
         
@@ -280,7 +305,28 @@ public class Main {
 //        myC45 x = (myC45) model.load("C45.model");
         
 //        model.evaluate(x, playData);
+    }
+    
+    /**
+     * @param args the command line arguments
+     * @throws java.lang.Exception
+     */
+    public static void main(String[] args) throws Exception {
+        // TODO code application logic here
         
+        Scanner scan = new Scanner(System.in);
+        
+        Instances rawData, playData;
+        
+        Main model = new Main();
+        
+        /* LOAD DATA */
+        
+        System.out.print("Masukkan nama file -> "); model.fileName = scan.next();// String fileName = "weather.nominal.arff"
+        playData = model.prepareData(model.fileName);
+        
+        mainMenu(playData, model);
+                
     }
     
 }
