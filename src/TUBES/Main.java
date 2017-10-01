@@ -23,26 +23,23 @@ import weka.filters.supervised.instance.Resample;
  */
 public class Main {
 
-    Instances rawData, playData;
     myID3 id3;
-//    myC45 c45;
-    Evaluation E;
-        
+    myC45 c45;
     
     // membuat instance baru dari masukan pengguna
-    public Instance makeNewInstance() {
+    public Instance makeNewInstance(Instances data) {
         
-        double[] values = new double[playData.numAttributes()];
+        double[] values = new double[data.numAttributes()];
         Scanner in = new Scanner(System.in);
 
-        for(int i = 0; i < playData.numAttributes() - 1; i++) {
-                System.out.print(playData.attribute(i).name() + " : ");
+        for(int i = 0; i < data.numAttributes() - 1; i++) {
+                System.out.print(data.attribute(i).name() + " : ");
                 values[i] = in.nextDouble();
         }
 
         Instance instance = new Instance(1.0, values);
         // You have to associate every new instance you create to an Instances object using setDataset.
-        instance.setDataset(playData);
+        instance.setDataset(data);
         return instance;
     }
     
@@ -126,7 +123,7 @@ public class Main {
         if (valid) {
             Evaluation evaluation;
             try {
-                Instances data1 = this.playData;
+                Instances data1 = data;
 
                 evaluation = new Evaluation(data1);
                 evaluation.evaluateModel(classifier, evalData);
@@ -156,43 +153,44 @@ public class Main {
     {
         id3 = new myID3();
 
-        id3.buildClassifier(data);
+        Discretize D = new Discretize();
+        D.setInputFormat(data);
+        Instances newData = Filter.useFilter(data, D);
+        
+        id3.buildClassifier(newData);
         
         System.out.println(id3.toString());
     }
 
-//    public void prepare45(Instances data) throws Exception
-//    {
-//        c45 = new myC45();
-//
-//        c45.buildClassifier(data);
-//        
-//        System.out.println(c45.toString());
-//    }        
-    
-    public void prepareData(String fileName) throws Exception
+    public void prepareC45(Instances data) throws Exception
     {
-        boolean useResample = false;
+        c45 = new myC45();
+
+        c45.buildClassifier(data);
+        
+//        System.out.println(c45.toString());
+    }        
+    
+    public Instances prepareData(String fileName) throws Exception
+    {
         Scanner in = new Scanner(System.in);
         
         System.out.print("Use Resampling? (Y/N) >>> ");
-        useResample = (in.next().toUpperCase().charAt(0) == 'Y' ? true : false);
+        boolean useResample = (in.next().toUpperCase().charAt(0) == 'Y' ? true : false);
         System.out.println();
         
         DataSource source = new DataSource(fileName);
-        rawData = new Instances(source.getDataSet());
-        rawData.setClassIndex(rawData.numAttributes() - 1);
+        Instances data = new Instances(source.getDataSet());
+        data.setClassIndex(data.numAttributes() - 1);
         
         if(useResample){
             Resample R = new Resample();
-            R.setInputFormat(rawData);
-            rawData = Filter.useFilter(rawData, R);
+            R.setInputFormat(data);
+            data = Filter.useFilter(data, R);
         }
-
-        Discretize D = new Discretize();
-        D.setInputFormat(rawData);
-        playData = Filter.useFilter(rawData, D);
-        System.out.println(playData);
+        System.out.println(data);
+        
+        return data;
     }
     
     /**
@@ -202,77 +200,82 @@ public class Main {
     public static void main(String[] args) throws Exception {
         // TODO code application logic here
         
+        Instances rawData, playData;
+        
         Main model = new Main();
         
         /* LOAD DATA */
         
-        String fileName = "car.data"; // weather.nominal.arff
-        model.prepareData(fileName);
+        String fileName = "weather.nominal.arff"; // weather.nominal.arff
+        playData = model.prepareData(fileName);
         
-        /* BUILD ID3 CLASSIFIER */
+//        /* BUILD ID3 CLASSIFIER */
+//        
+//        System.out.println("Build ID3 with "+fileName);
+//        model.prepareID3(playData); 
+//        System.out.println();
+//        
+//        /* TESTING & EVALUATION */
+//        
+//        System.out.println("Full Training - ID3 with "+fileName);
+//        model.evaluate(model.id3, playData);
+//        
+//        System.out.println("10-Fold Cross Validation - ID3 with "+fileName);
+//        model.validate(model.id3, playData);
+//        
+//        System.out.println("Split Test - ID3 with "+fileName);
+//        model.split_test(model.id3, playData);
+//        
+//        /* MODEL TEST USING DATA SET */
+//        model.test(model.id3, playData);
+//
+//        /* Classifying Instance */
+//        
+//        Instance test = model.makeNewInstance();
+//        System.out.println(playData.classAttribute().value((int) model.id3.classifyInstance(test)));
+//
+//        /* SAVE-LOAD MODEL */
+//        
+//        System.out.println("Save ID3");
+//        model.save(model.id3, "ID3");
+//        
+//        myID3 x = (myID3) model.load("ID3.model");
+//        
+//        model.evaluate(x, playData);
+
+        /* BUILD C4.5 CLASSIFIER */
         
-        System.out.println("Build ID3 with "+fileName);
-        model.prepareID3(model.playData); 
+        System.out.println("Build C4.5 with "+fileName);
+        model.prepareC45(playData); 
         System.out.println();
         
         /* TESTING & EVALUATION */
         
         System.out.println("Full Training - ID3 with "+fileName);
-        model.evaluate(model.id3, model.playData);
+        model.evaluate(model.c45, playData);
         
         System.out.println("10-Fold Cross Validation - ID3 with "+fileName);
-        model.validate(model.id3, model.playData);
+        model.validate(model.c45, playData);
         
         System.out.println("Split Test - ID3 with "+fileName);
-        model.split_test(model.id3, model.playData);
-        
+        model.split_test(model.c45, playData);
+
         /* MODEL TEST USING DATA SET */
-        model.test(model.id3, model.playData);
-
+        model.test(model.id3, playData);
+        
         /* Classifying Instance */
         
-        Instance test = model.makeNewInstance();
-        System.out.println(model.playData.classAttribute().value((int) model.id3.classifyInstance(test)));
-
-        /* SAVE-LOAD MODEL */
-        
-//        System.out.println("Save ID3");
-//        model.save(model.id3, "ID3");
-        
-//        myID3 x = (myID3) model.load("ID3.model");
-//        
-//        model.evaluate(x, model.playData);
-
-        /* BUILD C4.5 CLASSIFIER */
-        
-//        System.out.println("Build C4.5 with "+fileName);
-//        model.prepareC45(); 
-//        System.out.println();
-        
-        /* TESTING & EVALUATION */
-        
-//        System.out.println("Full Training - ID3 with "+fileName);
-//        model.evaluate(model.c45, model.playData);
-//        
-//        System.out.println("10-Fold Cross Validation - ID3 with "+fileName);
-//        model.validate(model.c45, model.playData);
-//        
-//        System.out.println("Split Test - ID3 with "+fileName);
-//        model.split_test(model.c45, model.playData);
-
-        /* Classifying Instance */
-        
-//        Instance test = model.makeNewInstance();
-//        System.out.println(model.playData.classAttribute().value((int) model.c45.classifyInstance(test)));
+        Instance test = model.makeNewInstance(playData);
+        System.out.println(playData.classAttribute().value((int) model.c45.classifyInstance(test)));
 
         /* SAVE-LOAD MODEL */
         
 //        System.out.println("Save C45");
 //        model.save(model.id3, "C45");
-        
-//        myC45 x = (myC45) model.load("C45.model");
 //        
-//        model.evaluate(x, model.playData);
+//        myC45 x = (myC45) model.load("C45.model");
+        
+//        model.evaluate(x, playData);
         
     }
     

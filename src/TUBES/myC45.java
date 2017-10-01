@@ -49,7 +49,6 @@ public class myC45 extends Classifier implements Serializable{
     public myC45(){
 //        this.dataIris = DataSource.read("G:/STEI/STI/Semester 7/IF 4071 Pembelajaran Mesin/Tubes 1/weka-3-6-14/iris.2D.arff");;
         splitController = new SplitData();
-        System.out.println("Hello, World!"); 
     }
 
     private static class Default {
@@ -161,7 +160,6 @@ public class myC45 extends Classifier implements Serializable{
       m_ClassValue = Utils.maxIndex(class_Distribution);
       m_ClassAttribute = data.classAttribute();
     } else {      
-      myC45[] child_Nodes;
       if (!main_Attribute.isNumeric()) {
         child_Nodes = new myC45[main_Attribute.numValues()];
         splitController.splitData(data, main_Attribute);
@@ -249,10 +247,10 @@ public class myC45 extends Classifier implements Serializable{
         Enumeration instEnum = data.enumerateInstances();
         while (instEnum.hasMoreElements()) {
           Instance inst = (Instance) instEnum.nextElement();
-          class_Distribution[(int) inst.classValue()]++;
+          temp_Distribution[(int) inst.classValue()]++;
         }
-        Utils.normalize(class_Distribution);
-        Default default_leaf = new Default(data.classAttribute(), Utils.maxIndex(class_Distribution));
+        Utils.normalize(temp_Distribution);
+        Default default_leaf = new Default(data.classAttribute(), Utils.maxIndex(temp_Distribution));
         
         return default_leaf;
   }
