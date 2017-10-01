@@ -17,6 +17,7 @@ import weka.core.Attribute;
 import weka.core.Utils;
 
 import java.util.Enumeration;
+import java.util.HashMap;
 
 public class myC45 extends Classifier implements Serializable{
     
@@ -26,6 +27,9 @@ public class myC45 extends Classifier implements Serializable{
 
   /** Attribute used for splitting. Null if leaves*/
   private Attribute main_Attribute;
+  
+  /** Used attribute in previous nodes of the tree*/
+  private static ArrayList<Attribute> usedAttributes;
 
   /** Class value if node is leaf. */
   private double m_ClassValue;
@@ -47,10 +51,10 @@ public class myC45 extends Classifier implements Serializable{
     
   /** Default class value if receiving missing value */
     public myC45(){
+            splitController = new SplitData();
 //        this.dataIris = DataSource.read("G:/STEI/STI/Semester 7/IF 4071 Pembelajaran Mesin/Tubes 1/weka-3-6-14/iris.2D.arff");;
-        splitController = new SplitData();
     }
-
+    
     private static class Default {
         private Attribute classAttribute;
         private double classValue;
@@ -113,7 +117,7 @@ public class myC45 extends Classifier implements Serializable{
     data = new Instances(data);
     
     Default default_data = computeDefaultValue(data);
-    makeTree(data, default_data);
+    makeTree(data, default_data, null);
   }
 
   /**
@@ -122,8 +126,18 @@ public class myC45 extends Classifier implements Serializable{
    * @param data the training data
    * @exception Exception if decision tree can't be built successfully
    */
-  private void makeTree(Instances data, Default default_data) throws Exception {
-
+  private void makeTree(Instances data, Default default_data, ArrayList<Attribute> used) throws Exception {
+    // Initialize variables
+    usedAttributes = new ArrayList<>();
+    if (used != null){
+        usedAttributes = used;
+        for (int i = 0; i < usedAttributes.size(); i++) {
+            data.deleteAttributeAt(usedAttributes.get(i).index());
+        }
+    }
+    numericValues = new double[data.numAttributes()];
+    //System.out.println(data);
+    
     // Check if no instances have reached this node. Missing Value
     if (data.numInstances() == 0) {
       main_Attribute = null;
@@ -131,6 +145,21 @@ public class myC45 extends Classifier implements Serializable{
       m_ClassAttribute = default_data.classAttribute();
       class_Distribution = new double[data.numClasses()];
       return;
+    }
+    
+    //Make leaf if all attributes has been used, use most common class
+    if (usedAttributes.size() == data.numAttributes()) {
+      class_Distribution = new double[data.numClasses()];
+      Enumeration classEnum = data.enumerateAttributes();
+      while (classEnum.hasMoreElements()) {
+         Instance inst = (Instance) classEnum.nextElement(); 
+         class_Distribution[(int) inst.classIndex()]++;
+      }  
+      double chosenClass = Utils.maxIndex(class_Distribution);
+      main_Attribute = null;
+      m_ClassValue = chosenClass;
+      m_ClassAttribute = data.classAttribute();
+      return;  
     }
         
     // Compute attribute with maximum information gain.
@@ -150,6 +179,9 @@ public class myC45 extends Classifier implements Serializable{
       }
     }
     main_Attribute = data.attribute(Utils.maxIndex(gainRatios));
+    usedAttributes.add(main_Attribute);
+    //for (int i = 0; i < numericValues.length; i++)
+    //System.out.println(gainRatios[i]);
     
     // Make leaf if information gain is zero. 
     // Otherwise create successors.
@@ -176,9 +208,10 @@ public class myC45 extends Classifier implements Serializable{
       }
       
       Instances[] splitData = splitController.getSplit();
+      //System.out.println(splitData);
       for (int j = 0; j < child_Nodes.length; j++) {
         child_Nodes[j] = new myC45();
-        child_Nodes[j].makeTree(splitData[j], default_data);
+        child_Nodes[j].makeTree(splitData[j], default_data, used);
       }
     }
   }
@@ -272,8 +305,9 @@ public class myC45 extends Classifier implements Serializable{
     throws Exception {
 
     double infoGain = computeEntropy(data);
-    splitController.splitData(data, att);
-    Instances[] splitData = splitController.getSplit();
+    SplitData splitSub = new SplitData();
+    splitSub.splitData(data, att);
+    Instances[] splitData = splitSub.getSplit();
     for (int j = 0; j < att.numValues(); j++) {
       if (splitData[j].numInstances() > 0) {
         infoGain -= ((double) splitData[j].numInstances() /
@@ -296,9 +330,10 @@ public class myC45 extends Classifier implements Serializable{
     throws Exception {
 
     double infoGain = computeEntropy(data);
-    splitController.splitDataNumeric(data, att, value );
-    Instances[] splitData = splitController.getSplit();
-    for (int j = 0; j < att.numValues(); j++) {
+    SplitData splitSub = new SplitData();
+    splitSub.splitDataNumeric(data, att, value );
+    Instances[] splitData = splitSub.getSplit();
+    for (int j = 0; j < 2; j++) {
       if (splitData[j].numInstances() > 0) {
         infoGain -= ((double) splitData[j].numInstances() /
                      (double) data.numInstances()) *
@@ -430,36 +465,68 @@ public class myC45 extends Classifier implements Serializable{
       }
       
       // Calculate gain ratio for split candidate
-      double[] infoGains = new double[data.numAttributes()];
-      for (int i = 0; i < randomSplit.size(); i++) {       
-        infoGains[i] = computeNumericInfoGain(data, att, randomSplit.get(i));
+      if (randomSplit.size() > 0) {
+        double[] infoGains = new double[randomSplit.size()];
+        for (int i = 0; i < randomSplit.size(); i++) {       
+          infoGains[i] = computeNumericInfoGain(data, att, randomSplit.get(i));
+        }
+        int chosenIndex = Utils.maxIndex(infoGains);
+        numericValues[att.index()] = randomSplit.get(chosenIndex);
+        return infoGains[chosenIndex];
+      } else {
+          return 0;
       }
-      int chosenIndex = Utils.maxIndex(infoGains);
-      numericValues[att.index()] = randomSplit.get(chosenIndex);
-      return infoGains[chosenIndex];
   }
   
-  /**
-   * Add data with missing value to class distribution with rule
-   * of most common class
-   *
-   * @param data the data which class distribution is to be determined
-   */
-  private void handleMissingValues(Instances data, Attribute att) {
-      // Create class distribution based on data
-      double missingCount = 0;
-      Enumeration instEnum1 = data.enumerateInstances();
-      while (instEnum1.hasMoreElements()) {
-        Instance inst = (Instance) instEnum1.nextElement();
-        if (!inst.isMissing(main_Attribute)) {
-            class_Distribution[(int) inst.classValue()]++;
+    private ArrayList<Double> getChildClasses(myC45 subTree) {
+        // If node is not leaf, get child's class value
+        ArrayList<Double> childValues = new ArrayList<>();
+        if (subTree.main_Attribute != null) {
+            for (int i = 0; i < subTree.child_Nodes.length; i++) {
+                childValues.addAll(getChildClasses(subTree.child_Nodes[i]));
+            }
         } else {
-            missingCount++;
+            childValues.add(subTree.m_ClassValue);
         }
-      }
-      class_Distribution[Utils.maxIndex(class_Distribution)] += missingCount;
-      Utils.normalize(class_Distribution);
-  }
+        return childValues;
+    }
+    
+    private Double getMajorityClass(myC45 subTree) {
+        ArrayList<Double> childValues = getChildClasses(subTree);
+        HashMap<Double,Integer> hm = new HashMap<Double,Integer>();
+        int max  = 1;
+        Double temp = 0.0;
+
+        for(int i = 0; i < childValues.size(); i++) {
+
+            if (hm.get(childValues.get(i)) != null) {
+
+                int count = hm.get(childValues.get(i));
+                count++;
+                hm.put(childValues.get(i), count);
+
+                if(count > max) {
+                    max  = count;
+                    temp = childValues.get(i);
+                }
+            }
+            else 
+                hm.put(childValues.get(i),1);
+        }
+        return temp;
+    }
+    
+    private boolean isPrune(myC45 treeNow) {
+        return true;
+    }
+
+    public void pruneTree() {
+//        get tree root
+//        change subtree below with leaf or majority
+//        measure accuracy
+//        if ok then prune
+//        else to next non leaf node
+    }
   
   /**
    * Prints the decision tree using the private toString method from below.
