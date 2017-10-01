@@ -18,6 +18,7 @@ import weka.core.Utils;
 
 import java.util.Enumeration;
 import java.util.HashMap;
+import weka.classifiers.Evaluation;
 
 public class myC45 extends Classifier implements Serializable{
     
@@ -30,6 +31,7 @@ public class myC45 extends Classifier implements Serializable{
   
   /** Used attribute in previous nodes of the tree*/
   private static ArrayList<Attribute> usedAttributes;
+
   /** Class value if node is leaf. */
   private double m_ClassValue;
 
@@ -38,6 +40,9 @@ public class myC45 extends Classifier implements Serializable{
 
   /** Class attribute of dataset. */
   private Attribute m_ClassAttribute;
+  
+  /** Dataset of current node. */
+  private Instances dataset;
   
   /** Container for storing chosen numeric value 
    * for numeric attributes. */
@@ -52,6 +57,18 @@ public class myC45 extends Classifier implements Serializable{
     public myC45(){
             splitController = new SplitData();
 //        this.dataIris = DataSource.read("G:/STEI/STI/Semester 7/IF 4071 Pembelajaran Mesin/Tubes 1/weka-3-6-14/iris.2D.arff");;
+    }
+    
+    private void copy (myC45 temp) {
+        this.child_Nodes = temp.child_Nodes;
+        this.class_Distribution = temp.class_Distribution;
+        this.dataset = temp.dataset;
+        this.main_Attribute = temp.main_Attribute;
+        this.m_ClassValue = temp.m_ClassValue;
+        this.m_ClassAttribute = temp.m_ClassAttribute;
+//        this.numericValues = temp.numericValues;
+//        this.splitController = temp.splitController;
+//        this.usedAttributes = temp.usedAttributes;
     }
     
     private static class Default {
@@ -72,18 +89,6 @@ public class myC45 extends Classifier implements Serializable{
             
             return this.classValue;
         }
-    }
-    
-    public Attribute mainAttribute(){
-        return this.main_Attribute;
-    }
-    
-    public myC45[] child_Nodes(){
-        return this.child_Nodes;
-    }
-    
-    public double classValue(){
-        return this.m_ClassValue;
     }
     
     /**
@@ -129,6 +134,10 @@ public class myC45 extends Classifier implements Serializable{
     
     Default default_data = computeDefaultValue(data);
     makeTree(data, default_data, null);
+    myC45 finalTree = new myC45();
+    //finalTree = this;
+    //finalTree = pruneTree(finalTree);
+    //copy(finalTree);
   }
 
   /**
@@ -139,29 +148,30 @@ public class myC45 extends Classifier implements Serializable{
    */
   private void makeTree(Instances data, Default default_data, ArrayList<Attribute> used) throws Exception {
     // Initialize variables
+    dataset = data;
     usedAttributes = new ArrayList<>();
     if (used != null){
         usedAttributes = used;
         for (int i = 0; i < usedAttributes.size(); i++) {
-            data.deleteAttributeAt(usedAttributes.get(i).index());
+            dataset.deleteAttributeAt(usedAttributes.get(i).index());
         }
     }
-    numericValues = new double[data.numAttributes()];
+    numericValues = new double[dataset.numAttributes()];
     //System.out.println(data);
     
     // Check if no instances have reached this node. Missing Value
-    if (data.numInstances() == 0) {
+    if (dataset.numInstances() == 0) {
       main_Attribute = null;
       m_ClassValue = default_data.classValue();
       m_ClassAttribute = default_data.classAttribute();
-      class_Distribution = new double[data.numClasses()];
+      class_Distribution = new double[dataset.numClasses()];
       return;
     }
     
     //Make leaf if all attributes has been used, use most common class
-    if (usedAttributes.size() == data.numAttributes()) {
-      class_Distribution = new double[data.numClasses()];
-      Enumeration classEnum = data.enumerateAttributes();
+    if (usedAttributes.size() == dataset.numAttributes()) {
+      class_Distribution = new double[dataset.numClasses()];
+      Enumeration classEnum = dataset.enumerateAttributes();
       while (classEnum.hasMoreElements()) {
          Instance inst = (Instance) classEnum.nextElement(); 
          class_Distribution[(int) inst.classIndex()]++;
@@ -169,24 +179,24 @@ public class myC45 extends Classifier implements Serializable{
       double chosenClass = Utils.maxIndex(class_Distribution);
       main_Attribute = null;
       m_ClassValue = chosenClass;
-      m_ClassAttribute = data.classAttribute();
+      m_ClassAttribute = dataset.classAttribute();
       return;  
     }
         
     // Compute attribute with maximum information gain.
     // If attribute is continuous valued, define discrete values for attribute
-    double[] infoGains = new double[data.numAttributes()];
-    double[] gainRatios = new double[data.numAttributes()];
-    Enumeration attEnum = data.enumerateAttributes();
+    double[] infoGains = new double[dataset.numAttributes()];
+    double[] gainRatios = new double[dataset.numAttributes()];
+    Enumeration attEnum = dataset.enumerateAttributes();
     while (attEnum.hasMoreElements()) {
       Attribute att = (Attribute) attEnum.nextElement();
       if (att.isNumeric()) {
-        infoGains[att.index()] = calculateNumeric(data, att);
+        infoGains[att.index()] = calculateNumeric(dataset, att);
         gainRatios[att.index()] = infoGains[att.index()] / 
-            computeSplitInfoNumeric(data, att, numericValues[att.index()]);
+            computeSplitInfoNumeric(dataset, att, numericValues[att.index()]);
       } else {
-        infoGains[att.index()] = computeInfoGain(data, att);
-        gainRatios[att.index()] = infoGains[att.index()] / computeSplitInfo(data,att);
+        infoGains[att.index()] = computeInfoGain(dataset, att);
+        gainRatios[att.index()] = infoGains[att.index()] / computeSplitInfo(dataset,att);
       }
     }
     main_Attribute = data.attribute(Utils.maxIndex(gainRatios));
@@ -198,15 +208,9 @@ public class myC45 extends Classifier implements Serializable{
     // Otherwise create successors.
     if (Utils.eq(infoGains[main_Attribute.index()], 0)) {
       main_Attribute = null;
-      class_Distribution = new double[data.numClasses()];
-      Enumeration instEnum = data.enumerateInstances();
-      while (instEnum.hasMoreElements()) {
-        Instance inst = (Instance) instEnum.nextElement();
-        class_Distribution[(int) inst.classValue()]++;
-      }
-      Utils.normalize(class_Distribution);
+      class_Distribution = getClassDistribution(this);
       m_ClassValue = Utils.maxIndex(class_Distribution);
-      m_ClassAttribute = data.classAttribute();
+      m_ClassAttribute = dataset.classAttribute();
     } else {      
       if (!main_Attribute.isNumeric()) {
         child_Nodes = new myC45[main_Attribute.numValues()];
@@ -488,7 +492,30 @@ public class myC45 extends Classifier implements Serializable{
           return 0;
       }
   }
+    
+  /**
+   * Calculate class distribution of node
+   *
+   * @param node the node which class distribution is to be calculated
+   * @return the class distribution of the node
+   */
+    private double[] getClassDistribution(myC45 node) {
+        double [] dist = new double[node.dataset.numClasses()];
+        Enumeration instEnum = node.dataset.enumerateInstances();
+        while (instEnum.hasMoreElements()) {
+            Instance inst = (Instance) instEnum.nextElement();
+            dist[(int) inst.classValue()]++;
+        }
+        Utils.normalize(dist);
+        return dist;
+    }
   
+    /**
+   * Get child class values of node
+   *
+   * @param subTree the node of which it's child is to be retrieved
+   * @return the array of values of all child classes
+   */
     private ArrayList<Double> getChildClasses(myC45 subTree) {
         // If node is not leaf, get child's class value
         ArrayList<Double> childValues = new ArrayList<>();
@@ -502,9 +529,15 @@ public class myC45 extends Classifier implements Serializable{
         return childValues;
     }
     
+    /**
+   * Get most common class of node determined by it's child
+   *
+   * @param subTree the node which it's most common class is to be determined
+   * @return the most common class' value
+   */
     private Double getMajorityClass(myC45 subTree) {
         ArrayList<Double> childValues = getChildClasses(subTree);
-        HashMap<Double,Integer> hm = new HashMap<Double,Integer>();
+        HashMap<Double,Integer> hm = new HashMap<>();
         int max  = 1;
         Double temp = 0.0;
 
@@ -527,16 +560,48 @@ public class myC45 extends Classifier implements Serializable{
         return temp;
     }
     
-    private boolean isPrune(myC45 treeNow) {
-        return true;
+    /**
+   * Return the result of pruning input subtree according to child index
+   *
+   * @param inNode the node which it's child is going to be pruned
+   * @param index the index of child that is going to be pruned
+   * @return the pruned child of input node according to index
+   */
+    private myC45 alterChild(myC45 inNode, int index) {
+        myC45 child = inNode.child_Nodes[index];
+        child.main_Attribute = null;
+        child.child_Nodes = null;
+        child.m_ClassValue = getMajorityClass(child);
+        child.m_ClassAttribute = child.dataset.classAttribute();
+        child.class_Distribution = getClassDistribution(child);
+        return child;
     }
 
-    public void pruneTree() {
-//        get tree root
-//        change subtree below with leaf or majority
-//        measure accuracy
-//        if ok then prune
-//        else to next non leaf node
+     /**
+   * Return pruned tree or iterate through tree to prune subtrees recursively
+   *
+   * @param node the tree node which is going to be pruned
+   * @return pruned tree
+   */
+    private myC45 pruneTree(myC45 node) throws Exception{
+        if (node.main_Attribute == null) {} 
+        else {
+            for (int i = 0; i < node.child_Nodes.length; i++) {
+                Evaluation eval = new Evaluation(node.dataset);
+                eval.evaluateModel(node, node.dataset);
+                double initError = eval.errorRate();
+                myC45 altered = alterChild(node,i);
+                node.child_Nodes[i] = altered;
+                eval.evaluateModel(node, node.dataset);
+                double endError = eval.errorRate();
+                if (Utils.gr(initError, endError)) {
+                    node.child_Nodes[i] = altered;
+                } else {
+                    node.child_Nodes[i] = pruneTree(node.child_Nodes[i]);
+                }
+            }
+        }
+        return node;
     }
   
   /**
