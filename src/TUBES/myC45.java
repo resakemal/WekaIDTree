@@ -134,21 +134,25 @@ public class myC45 extends Classifier implements Serializable{
         
     // Compute attribute with maximum information gain.
     // If attribute is continuous valued, define discrete values for attribute
+    double[] infoGains = new double[data.numAttributes()];
     double[] gainRatios = new double[data.numAttributes()];
     Enumeration attEnum = data.enumerateAttributes();
     while (attEnum.hasMoreElements()) {
       Attribute att = (Attribute) attEnum.nextElement();
       if (att.isNumeric()) {
-        gainRatios[att.index()] = calculateNumeric(data, att);
+        infoGains[att.index()] = calculateNumeric(data, att);
+        gainRatios[att.index()] = infoGains[att.index()] / 
+            computeSplitInfoNumeric(data, att, numericValues[att.index()]);
       } else {
-        gainRatios[att.index()] = computeInfoGain(data, att)/computeSplitInfo(data,att);
+        infoGains[att.index()] = computeInfoGain(data, att);
+        gainRatios[att.index()] = infoGains[att.index()] / computeSplitInfo(data,att);
       }
     }
     main_Attribute = data.attribute(Utils.maxIndex(gainRatios));
     
     // Make leaf if information gain is zero. 
     // Otherwise create successors.
-    if (Utils.eq(gainRatios[main_Attribute.index()], 0)) {
+    if (Utils.eq(infoGains[main_Attribute.index()], 0)) {
       main_Attribute = null;
       class_Distribution = new double[data.numClasses()];
       Enumeration instEnum = data.enumerateInstances();
@@ -431,7 +435,7 @@ public class myC45 extends Classifier implements Serializable{
       }
       int chosenIndex = Utils.maxIndex(infoGains);
       numericValues[att.index()] = randomSplit.get(chosenIndex);
-      return infoGains[chosenIndex] / computeSplitInfoNumeric(data, att, randomSplit.get(chosenIndex));
+      return infoGains[chosenIndex];
   }
   
   /**

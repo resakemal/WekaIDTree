@@ -5,6 +5,7 @@
  */
 package TUBES;
 
+import java.io.Serializable;
 import java.util.Enumeration;
 import weka.core.Attribute;
 import weka.core.Instance;
@@ -15,7 +16,7 @@ import weka.core.Utils;
  *
  * @author Resa Kemal Saharso
  */
-public class SplitData {
+public class SplitData implements Serializable {
     
     private Instances[] split;
     private int mostCommon;
