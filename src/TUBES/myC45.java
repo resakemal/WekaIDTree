@@ -304,9 +304,9 @@ public class myC45 extends Classifier implements Serializable{
   }
   
     /**
-   * Computes information gain for an attribute.
+   * Computes split information for an attribute
    *
-   * @param data the data for which info gain is to be computed
+   * @param data the data for which split info is to be computed
    * @param att the attribute
    * @return the information gain for the given attribute and data
    * @throws Exception if computation fails
@@ -323,6 +323,37 @@ public class myC45 extends Classifier implements Serializable{
     }
     double splitInfo = 0;
     for (int j = 0; j < att.numValues(); j++) {
+      if (valueCount[j] > 0) {
+        splitInfo -= (valueCount[j] / (double) data.numInstances()) * Utils.log2(valueCount[j] / (double) data.numInstances());
+      }
+    }
+    return splitInfo;
+  }
+  
+    /**
+   * Computes split information for a numeric attribute.
+   *
+   * @param data the data for which split info is to be computed
+   * @param att the attribute
+   * @return the information gain for the given attribute and data
+   * @throws Exception if computation fails
+   */
+  private double computeSplitInfoNumeric(Instances data, Attribute att, double value) throws Exception {
+      
+    double [] valueCount = new double[2];
+    Enumeration instEnum = data.enumerateInstances();
+    while (instEnum.hasMoreElements()) {
+      Instance inst = (Instance) instEnum.nextElement();
+      if (!inst.isMissing(att)) {
+        if (inst.value(att) <= value) {
+            valueCount[0]++;
+        } else {
+            valueCount[1]++;
+        }
+      }
+    }
+    double splitInfo = 0;
+    for (int j = 0; j < 2; j++) {
       if (valueCount[j] > 0) {
         splitInfo -= (valueCount[j] / (double) data.numInstances()) * Utils.log2(valueCount[j] / (double) data.numInstances());
       }
@@ -400,7 +431,7 @@ public class myC45 extends Classifier implements Serializable{
       }
       int chosenIndex = Utils.maxIndex(infoGains);
       numericValues[att.index()] = randomSplit.get(chosenIndex);
-      return infoGains[chosenIndex];
+      return infoGains[chosenIndex] / computeSplitInfoNumeric(data, att, randomSplit.get(chosenIndex));
   }
   
   /**
