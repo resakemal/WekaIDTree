@@ -80,7 +80,7 @@ public class Main {
         Instances train = new Instances(data, 0, trainSize);
         Instances test = new Instances(data, trainSize, testSize);
         Evaluation eval = new Evaluation(test);
-        myID3 cls = new myID3();
+        Classifier cls = classifier;
         cls.buildClassifier(train);
         System.out.println("check");
         eval.evaluateModel(cls, test);
@@ -126,9 +126,8 @@ public class Main {
         if (valid) {
             Evaluation evaluation;
             try {
-                Instances data1 = data;
 
-                evaluation = new Evaluation(data1);
+                evaluation = new Evaluation(data);
                 evaluation.evaluateModel(classifier, evalData);
 
                 System.out.println(evaluation.toSummaryString());
@@ -155,12 +154,8 @@ public class Main {
     public void prepareID3(Instances data) throws Exception
     {
         id3 = new myID3();
-
-        Discretize D = new Discretize();
-        D.setInputFormat(data);
-        Instances newData = Filter.useFilter(data, D);
         
-        id3.buildClassifier(newData);
+        id3.buildClassifier(data);
         
         System.out.println(id3.toString());
     }
@@ -196,7 +191,7 @@ public class Main {
         return data;
     }
     
-    public static void mainMenu(Instances data, Main model){
+    public static void mainMenu(Instances data, Main model) throws Exception{
         Scanner in = new Scanner(System.in);
         
         int pilihan;
@@ -222,41 +217,46 @@ public class Main {
         }while(pilihan != -99);
     }
     
-    public static void runID3(Instances data, Main model){
+    public static void runID3(Instances data, Main model) throws Exception{
 
-//        /* BUILD ID3 CLASSIFIER */
-//        
-//        System.out.println("Build ID3 with "+fileName);
-//        model.prepareID3(playData); 
-//        System.out.println();
-//        
-//        /* TESTING & EVALUATION */
-//        
-//        System.out.println("Full Training - ID3 with "+fileName);
-//        model.evaluate(model.id3, playData);
-//        
-//        System.out.println("10-Fold Cross Validation - ID3 with "+fileName);
-//        model.validate(model.id3, playData);
-//        
-//        System.out.println("Split Test - ID3 with "+fileName);
-//        model.split_test(model.id3, playData);
-//        
-//        /* MODEL TEST USING DATA SET */
-//        model.test(model.id3, playData);
-//
-//        /* Classifying Instance */
-//        
-//        Instance test = model.makeNewInstance();
-//        System.out.println(playData.classAttribute().value((int) model.id3.classifyInstance(test)));
-//
-//        /* SAVE-LOAD MODEL */
-//        
-//        System.out.println("Save ID3");
-//        model.save(model.id3, "ID3");
-//        
-//        myID3 x = (myID3) model.load("ID3.model");
-//        
-//        model.evaluate(x, playData);
+        /* Discretize Data to handle Numeric value */
+        Discretize D = new Discretize();
+        D.setInputFormat(data);
+        data = Filter.useFilter(data, D);
+        
+        /* BUILD ID3 CLASSIFIER */
+        
+        System.out.println("BUILD ID3 WITH "+model.fileName);
+        model.prepareID3(data); 
+        System.out.println();
+        
+        /* TESTING & EVALUATION */
+        
+        System.out.println("FULL TRAINING - ID3 with "+model.fileName);
+        model.evaluate(model.id3, data);
+        
+        System.out.println("10-FOLD CROSS VALIDATION - ID3 with "+model.fileName);
+        model.validate(model.id3, data);
+        
+        System.out.println("SPLIT TEST - ID3 with "+model.fileName);
+        model.split_test(model.id3, data);
+        
+        /* MODEL TEST USING DATA SET */
+        model.test(model.id3, data);
+
+        /* Classifying Instance */
+        
+        Instance test = model.makeNewInstance(data);
+        System.out.println(data.classAttribute().value((int) model.id3.classifyInstance(test)));
+
+        /* SAVE-LOAD MODEL */
+        
+        System.out.println("Save ID3");
+        model.save(model.id3, "ID3");
+        
+        myID3 x = (myID3) model.load("ID3.model");
+        
+        model.evaluate(x, data);
     }
     
     public static void runC45(Instances data, Main model){
@@ -272,13 +272,13 @@ public class Main {
         
         /* TESTING & EVALUATION */
         try{
-            System.out.println("Full Training - ID3 with "+model.fileName);
+            System.out.println("FULL TRAINING - ID3 with "+model.fileName);
             model.evaluate(model.c45, data);
 
-            System.out.println("10-Fold Cross Validation - ID3 with "+model.fileName);
+            System.out.println("10-FOLD CROSS VALIDATION - ID3 with "+model.fileName);
             model.validate(model.c45, data);
 
-            System.out.println("Split Test - ID3 with "+model.fileName);
+            System.out.println("SPLIT TEST - ID3 with "+model.fileName);
             model.split_test(model.c45, data);
         } catch (Exception ex){
             //System.out.println(ex.getMessage());
@@ -316,17 +316,20 @@ public class Main {
         
         Scanner scan = new Scanner(System.in);
         
-        Instances rawData, playData;
+        Instances rawData;
         
         Main model = new Main();
         
         /* LOAD DATA */
         
         System.out.print("Masukkan nama file -> "); model.fileName = scan.next();// String fileName = "weather.nominal.arff"
-        playData = model.prepareData(model.fileName);
+        rawData = model.prepareData(model.fileName);
         
-        mainMenu(playData, model);
-                
+        try{
+            mainMenu(rawData, model);
+        }catch(Exception x){
+            System.out.println(x.getMessage());
+        }    
     }
     
 }
