@@ -80,7 +80,7 @@ public class Main {
         Instances train = new Instances(data, 0, trainSize);
         Instances test = new Instances(data, trainSize, testSize);
         Evaluation eval = new Evaluation(test);
-        myID3 cls = new myID3();
+        Classifier cls = classifier;
         cls.buildClassifier(train);
         System.out.println("check");
         eval.evaluateModel(cls, test);
