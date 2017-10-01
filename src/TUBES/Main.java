@@ -17,6 +17,7 @@ import weka.core.converters.ConverterUtils.DataSource;
 import weka.filters.Filter;
 import weka.filters.supervised.attribute.Discretize;
 import weka.filters.supervised.instance.Resample;
+import weka.filters.unsupervised.attribute.Remove;
 
 
 /**
@@ -73,9 +74,12 @@ public class Main {
     public void split_test(Classifier classifier, Instances data) throws Exception
     {
         /* Split Test */
+        Scanner scan = new Scanner(System.in);
+        
+        System.out.print("Masukkan rate split test (dalam %) >>> "); int rate = scan.nextInt();
         
         data.randomize(new java.util.Random(0));
-        int trainSize = (int) Math.round(data.numInstances() * 0.8);
+        int trainSize = (int) Math.round(data.numInstances() * rate/100);
         int testSize = data.numInstances() - trainSize;
         Instances train = new Instances(data, 0, trainSize);
         Instances test = new Instances(data, trainSize, testSize);
@@ -177,6 +181,10 @@ public class Main {
         boolean useResample = (in.next().toUpperCase().charAt(0) == 'Y' ? true : false);
         System.out.println();
         
+        System.out.print("Use Remove Attribute? (Y/N) >>> ");
+        boolean useRemove = (in.next().toUpperCase().charAt(0) == 'Y' ? true : false);
+        System.out.println();
+        
         DataSource source = new DataSource(fileName);
         Instances data = new Instances(source.getDataSet());
         data.setClassIndex(data.numAttributes() - 1);
@@ -185,6 +193,14 @@ public class Main {
             Resample R = new Resample();
             R.setInputFormat(data);
             data = Filter.useFilter(data, R);
+        }
+        
+        if(useRemove){
+            Remove remove = new Remove();
+            System.out.print("Pilih Atribut yang ingin dihilangkan (input int) >>> ");
+            remove.setAttributeIndices(in.next());
+            remove.setInputFormat(data);
+            data = Filter.useFilter(data, remove);
         }
         System.out.println(data);
         

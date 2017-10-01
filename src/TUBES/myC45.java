@@ -30,7 +30,6 @@ public class myC45 extends Classifier implements Serializable{
   
   /** Used attribute in previous nodes of the tree*/
   private static ArrayList<Attribute> usedAttributes;
-
   /** Class value if node is leaf. */
   private double m_ClassValue;
 
@@ -73,6 +72,18 @@ public class myC45 extends Classifier implements Serializable{
             
             return this.classValue;
         }
+    }
+    
+    public Attribute mainAttribute(){
+        return this.main_Attribute;
+    }
+    
+    public myC45[] child_Nodes(){
+        return this.child_Nodes;
+    }
+    
+    public double classValue(){
+        return this.m_ClassValue;
     }
     
     /**
